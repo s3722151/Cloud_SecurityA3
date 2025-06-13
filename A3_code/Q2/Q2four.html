@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Shamir's Secret Sharing with Paillier Key</title>
+</head>
+
+<body>
+    <h1>Shamir's Secret Sharing Implementation</h1>
+    <p>Secret (Paillier key parameter p): <span id="secret"></span></p>
+    <p>Polynomial: f(x) = s + a_1*x + a_2*x^2 mod p</p>
+    <p>Shares:</p>
+    <ul id="shares"></ul>
+    <p>Reconstructed secret using 3 shares: <span id="reconstructed"></span></p>
+
+    <script>
+        // Modular arithmetic functions for BigInt
+        function mod(n, m) {
+            n = BigInt(n);
+            m = BigInt(m);
+            return ((n % m) + m) % m;
+        }
+
+        function modInverse(a, m) {
+            a = mod(a, m);
+            let m0 = m, x0 = BigInt(0), x1 = BigInt(1);
+            while (a > BigInt(1)) {
+                if (m === BigInt(0)) throw new Error("Modular inverse does not exist");
+                let q = a / m;
+                [a, m] = [m, a % m];
+                [x0, x1] = [x1 - q * x0, x0];
+            }
+            if (a !== BigInt(1)) throw new Error("Modular inverse does not exist");
+            return mod(x1, m0);
+        }
+
+        // Polynomial evaluation: f(x) = s + a1*x + a2*x^2 mod p
+        function evaluatePolynomial(x, s, a1, a2, p) {
+            x = BigInt(x);
+            s = BigInt(s);
+            a1 = BigInt(a1);
+            a2 = BigInt(a2);
+            p = BigInt(p);
+            let term1 = mod(s, p);
+            let term2 = mod(a1 * x, p);
+            let term3 = mod(a2 * x * x, p);
+            return mod(term1 + term2 + term3, p);
+        }
+
+        // Generate shares
+        function generateShares(secret, n, t, a1, a2, p) {
+            let shares = [];
+            for (let x = 1; x <= n; x++) {
+                let y = evaluatePolynomial(x, secret, a1, a2, p);
+                shares.push([x, y]);
+            }
+            return shares;
+        }
+
+        // Lagrange interpolation to reconstruct secret
+        function reconstructSecret(shares, p) {
+            p = BigInt(p);
+            let secret = BigInt(0);
+            for (let i = 0; i < shares.length; i++) {
+                let [xi, yi] = shares[i];
+                xi = BigInt(xi);
+                yi = BigInt(yi);
+                let numerator = BigInt(1);
+                let denominator = BigInt(1);
+                for (let j = 0; j < shares.length; j++) {
+                    if (i !== j) {
+                        let xj = BigInt(shares[j][0]);
+                        numerator = mod(numerator * (BigInt(0) - xj), p);
+                        denominator = mod(denominator * (xi - xj), p);
+                    }
+                }
+                let term = mod(yi * numerator * modInverse(denominator, p), p);
+                secret = mod(secret + term, p);
+            }
+            return secret;
+        }
+
+        // Main function
+        function main() {
+            const secret = BigInt("10270478367349953314597551489320837603242711348375632176411097942248197941872493542289851574998006860998293050364402065827676742724453855410508669733372117");
+            const a1 = BigInt(3722151); // Student ID
+            const a2 = BigInt(20); // Random coefficient
+            const p = BigInt("10270478367349953314597551489320837603242711348375632176411097942248197941872493542289851574998006860998293050364402065827676742724453855410508669733372119");
+            const n = 4; // Number of shares
+            const t = 3; // Threshold
+
+            // Display secret (in decimal)
+            document.getElementById('secret').textContent = secret.toString();
+
+            // Generate shares
+            let shares = generateShares(secret, n, t, a1, a2, p);
+            let sharesList = document.getElementById('shares');
+            shares.forEach(([x, y]) => {
+                let li = document.createElement('li');
+                li.textContent = `Share (${x}, ${y.toString()})`;
+                sharesList.appendChild(li);
+            });
+
+            // Reconstruct secret using first 3 shares
+            let selectedShares = shares.slice(0, 3); // Using shares (1, y1), (2, y2), (3, y3)
+            let reconstructed = reconstructSecret(selectedShares, p);
+            document.getElementById('reconstructed').textContent = reconstructed.toString();
+        }
+
+        // Run the program
+        main();
+    </script>
+</body>
+
+</html>
